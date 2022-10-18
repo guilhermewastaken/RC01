@@ -1,8 +1,5 @@
 #include <stdio.h>
 
-//THE IDEA IS TO COPY THIS TO THE MAIN PROJECT LATER
-
-
 enum MACHINE {TRANSMITTER = 0, RECEIVER = 1};                                           //Machine constants
 enum HEADER_TYPE {INVALID = -1, INFO, SET, DISC, UA, RR, REJ};
 enum BYTE {FLAG = 0x7e, ESCAPE = 0x7d, ESC_FLAG = 0x5e, ESC_ESCAPE = 0x5d,              //Flag and byte stuffing
@@ -13,6 +10,17 @@ enum BYTE {FLAG = 0x7e, ESCAPE = 0x7d, ESC_FLAG = 0x5e, ESC_ESCAPE = 0x5d,      
 
 int machine;    //0 if transmitter or 1 if receiver
 int messageParity = 0;  //0 or 1, switches
+
+//Debug Functions
+void printByte(unsigned char byte) {
+    printf("%hhx\n", byte);
+}
+void printByteSequence(unsigned char *sequence, int size) {
+    for (size_t i = 0; i < size-1; i++) {
+        printf("%hhx-", sequence[i]);
+    }
+    printf("%hhx\n", sequence[size-1]);
+}
 
 unsigned char getBCC(unsigned char *content, int size) {
     unsigned char result = content[0];
@@ -87,7 +95,7 @@ int getHeaderType(unsigned char *header, int machine) {
     }
     //2- Check address and control
     if (machine == TRANSMITTER) {
-        if (header[1] == A_TCOMMAND) {  //Only UA, RR and REJ
+        if (header[1] == A_TRANSMITTER_COMMAND) {  //Only UA, RR and REJ
             if (header[2] == CNTRL_UA) {
                 return UA;
             }
@@ -125,18 +133,73 @@ int getHeaderType(unsigned char *header, int machine) {
     return INVALID;
 }
 
-//Debug Functions
-void printByte(unsigned char byte) {
-    printf("%hhx\n", byte);
-}
-void printByteSequence(unsigned char *sequence, int size) {
-    for (size_t i = 0; i < size-1; i++) {
-        printf("%hhx-", sequence[i]);
+int addStuffing(unsigned char *content, int size) {  //Content should be WAY BIGGER than size
+    //It should have 2* maximum message size for a worse case scenario (?)
+    int newSize = 0;
+    for (size_t i = 0; i < size; i++){
+        if ( (content[i] == FLAG || content[i] == ESCAPE) && i != size - 1) {
+            newSize++;
+            printByte(content[i]);
+        }
+        newSize++;
+    }                       //Checks size
+    unsigned char result[newSize];
+    size_t t = 0;
+    for (size_t i = 0; i < size; i++){
+        if (content[i] == FLAG && i != size - 1) {
+            result[t] = ESCAPE;
+            result[t+1] = ESC_FLAG;
+            t += 2;
+        }
+        else if (content[i] == ESCAPE && i != size - 1) {
+            result[t] = ESCAPE;
+            result[t+1] = ESC_ESCAPE;
+            t += 2;
+        }
+        else {
+            result[t] = content[i];
+            t++;
+        }
     }
-    printf("%hhx\n", sequence[size-1]);
+    printByteSequence(result, newSize);
+    return newSize;
 }
 
-int main() { //DELETE ME
-    unsigned char array1[3] = {0x00, 0x0F, 0xFF};
+int removeStuffing(unsigned char *content, int size) {
+    int newSize = 1;
+    for (size_t i = 0; i < size - 1; i++){
+        if ( (content[i] == ESCAPE && content[i+1] == ESC_FLAG) || (content[i] == ESCAPE && content[i+1] == ESC_ESCAPE) ) {
+            newSize--;
+        }
+        newSize++;
+    }                       //Checks size
+    unsigned char result[newSize];
+    size_t t = 0;
+    for (size_t i = 0; i < size; i++){
+        if (content[i] == ESCAPE && content[i+1] == ESC_FLAG) {
+            result[t] = FLAG;
+            i++;
+        }
+        else if (content[i] == ESCAPE && content[i+1] == ESC_ESCAPE) {
+            result[t] = ESCAPE;
+            i++;
+        }
+        else {
+            result[t] = content[i];
+        }
+        t++;
+    }
+
+
+    return newSize;
+}
+
+
+
+int main() {
+    unsigned char array1[10] = {0x00, ESCAPE,0x0F, FLAG, 0xFF, FLAG, 0x00, 0x00, 0x00, 0x00};
+    printf("%i", addStuffing(array1, 6));
     return 0;
 }
+
+
