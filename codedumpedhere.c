@@ -194,7 +194,93 @@ int removeStuffing(unsigned char *content, int size) {
     return newSize;
 }
 
+void alarmHandler(int signal)
+{
+    alarmEnabled = 0;
+    alarmCount++;
 
+}
+
+int sendPacket(int type, unsigned char * data, int dataSize) {
+    unsigned char msg[20];
+    int acknowledge = 0;
+    int alarmCount = 0;
+    int alarmEnabled = 1;
+
+    (void)signal(SIGALRM, alarmHandler);
+
+    while (!acknowledge) {
+        if (createHeader(msg, INFO) != 0) {
+            return -1;
+        }
+
+        if (write(fd, msg, 4) != 4) {
+            return -1;
+        }
+
+        if (type == INFO) {
+            for (int i = 0; i < dataSize; i++) {
+                msg[i] = data[i];
+            }
+            msg[dataSize] = getBCC(data, dataSize);
+            msg[dataSize + 1] = FLAG;
+            newSize = addStuffing(msg, dataSize);
+            if (write(fd, msg, newSize) != newSize) {
+                return -1;
+            }
+        }
+
+        else { // if it doesn't have data
+            msg[0] = FLAG;
+            if (write(fd, msg, 1) != 1) {
+                return -1;
+            }
+        }
+        alarm(10);
+        int typeResponse;
+        typeResponse = receivePacket();
+
+        if (type == SET) {
+            
+        }
+
+        if (type == DISC) {
+            if (machine == TRANSMITTER) {
+                if (typeResponse == DISC) {
+                    acknowledge = 1;
+                    alarm(0);
+                }
+            }
+            else if (machine == RECEIVER) {
+                if (typeResponse = UA) {
+                    acknowledge = 1;
+                    alarm(0);
+                }
+            }
+        }
+
+        if (type == info) {
+            if (messageParity == 0) {
+                // TO DO
+            }
+        }
+
+        if (type == UA || type == RR || type == REJ) {
+            acknowledge = 1;
+            alarm(0);
+        }
+
+        alarmEnabled = 1;    
+    }
+
+    if (messageParity == 0) {
+        messageParity = 1;
+    }
+    else if (messageParity == 1) {
+        messageParity = 0;
+    }
+    return 0;
+}
 
 int main() {
     unsigned char array1[10] = {0x00, ESCAPE,0x0F, FLAG, 0xFF, FLAG, 0x00, 0x00, 0x00, 0x00};
