@@ -161,7 +161,11 @@ int addStuffing(unsigned char *content, int size) {  //Content should be WAY BIG
             t++;
         }
     }
-    printByteSequence(result, newSize);
+
+    //Copy result to content
+    for (size_t i = 0; i < newSize; i++) {
+        content[i] = result[i];
+    }
     return newSize;
 }
 
@@ -189,7 +193,10 @@ int removeStuffing(unsigned char *content, int size) {
         }
         t++;
     }
-
+    //Copy result to content
+    for (size_t i = 0; i < newSize; i++) {
+        content[i] = result[i];
+    }
 
     return newSize;
 }
@@ -282,7 +289,7 @@ int sendPacket(int type, unsigned char * data, int dataSize) {
     (void)signal(SIGALRM, alarmHandler);
 
     while (!acknowledge) {
-        if (createHeader(msg, INFO) != 0) {
+        if (createHeader(msg, type) != 0) {
             return -1;
         }
 
@@ -335,7 +342,7 @@ int sendPacket(int type, unsigned char * data, int dataSize) {
             }
         }
 
-        if (type == info) {
+        if (type == INFO) {
             if (messageParity == 0) {
                 // TO DO
             }
