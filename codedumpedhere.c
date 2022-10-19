@@ -314,7 +314,10 @@ int sendPacket(int type, unsigned char * data, int dataSize) {
         typeResponse = receivePacket(newMsg, size_not_applicable);
 
         if (type == SET) {
-            
+            if (typeResponse == UA) {
+                    acknowledge = 1;
+                    alarm(0);
+            }
         }
 
         if (type == DISC) {
@@ -325,7 +328,7 @@ int sendPacket(int type, unsigned char * data, int dataSize) {
                 }
             }
             else if (machine == RECEIVER) {
-                if (typeResponse = UA) {
+                if (typeResponse == UA) {
                     acknowledge = 1;
                     alarm(0);
                 }
