@@ -265,10 +265,16 @@ int receivePacket(unsigned char *data, int *size) {
         }
     }
     //Check BCC and send REJ if wrong
+    if (data[counter - 2] != getBCC(data, counter -3)) {
+        //Should also send REJ
+        return INVALID;
+    }
     return header;
 }
+
 int sendPacket(int type, unsigned char * data, int dataSize) {
     unsigned char msg[20];
+    unsigned char newMsg[20];
     int acknowledge = 0;
     int alarmCount = 0;
     int alarmEnabled = 1;
@@ -304,7 +310,8 @@ int sendPacket(int type, unsigned char * data, int dataSize) {
         }
         alarm(10);
         int typeResponse;
-        typeResponse = receivePacket();
+        int size_not_applicable;
+        typeResponse = receivePacket(newMsg, size_not_applicable);
 
         if (type == SET) {
             
