@@ -84,8 +84,18 @@ int llopen(LinkLayer connectionParameters)
 
     printf("New termios structure set\n");
 
-  // place your code here Paula
-  
+    if(machine == TRANSMITTER){
+        if(sendPacket(SET, 0, 0) != 0){
+                return -1;
+        }
+    }
+    else if (machine == RECEIVER){
+        int type = receivePacket(0, 0);
+        if(type == SET){
+                if(sendPacket(UA, 0, 0) != 0){
+                        return -1;
+                }
+        }
     return 1;
 }
 
@@ -94,7 +104,11 @@ int llopen(LinkLayer connectionParameters)
 ////////////////////////////////////////////////
 int llwrite(const unsigned char *buf, int bufSize)
 {
-    // TODO
+    if(machine == TRANSMITTER){
+        if(sendPacket(INFO, buf, bufSize) != 0){
+                return -1;
+        }
+    }
 
     return 0;
 }
@@ -104,8 +118,19 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 int llread(unsigned char *packet)
 {
-    // TODO
-
+    if(machine == RECEIVER){
+        int type = receivePacket(packet, sizeof(packet));
+        if(type == INFO){
+                if(sendPacket(UA, 0, 0) != 0){
+                        return -1;
+                }
+        }
+        else if(type == DISC){
+                if(sendPacket(DISC, 0, 0) != 0){
+                        return -1;
+                }
+        }
+    }
     return 0;
 }
 
@@ -114,8 +139,17 @@ int llread(unsigned char *packet)
 ////////////////////////////////////////////////
 int llclose(int showStatistics)
 {
-    // TODO
-
+    if(machine == TRANSMITTER){
+        if(sendPacket(DISC, 0, 0) != 0){
+                return -1;
+        }
+        int type = receivePacket(0, 0);
+        if(type == DISC){
+                if(sendPacket(UA, 0, 0) != 0){
+                        return -1;
+                }
+        }
+    }
     return 1;
 }
 
