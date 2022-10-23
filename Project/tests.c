@@ -149,6 +149,9 @@ int createHeader(unsigned char *header, int type, int messageParity) {
         }
     }
     header[3] = getBCC(header, 3);
+    if (type != INFO) {
+        header[4] = FLAG;
+    }
     return 0;
 }
 
