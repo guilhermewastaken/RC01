@@ -459,7 +459,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     //---------------------
-    
+
 
     fd = open(serialPortName, O_RDWR | O_NOCTTY);
 
@@ -510,5 +510,23 @@ int main(int argc, char *argv[]) {
 
     printf("New termios structure set\n");
     std::cout << "Hello, World!" << std::endl;
+
+    
+    
+    
+    //WRITE YOUR CODE HERE!!!!!!!!!!
+
+    
+    
+    
+    // Restore the old port settings
+    if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
+    {
+        perror("tcsetattr");
+        exit(-1);
+    }
+
+    close(fd);
+    
     return 0;
 }
