@@ -7,6 +7,13 @@
 FRAME_SIZE = 1000;
 INPUT_SIZE = 450;
 
+//vv Delete this afterwards vv
+typedef enum
+{
+    LlTx,
+    LlRx,
+} LinkLayerRole;
+
 typedef struct
 {
     char serialPort[50];
@@ -56,19 +63,22 @@ void readControlPacket(int *type, int *fileSize, unsigned char *controlPacket) {
     //No need to return size since we are saving fileSize already
 }
 
-void startDataPacket(int sequenceNumber, int fileSize, unsigned char *dataPacket) {
-    dataPacket[0] = 0x01;
-    sequenceNumber = sequenceNumber % 256;
-    dataPacket[1] = (unsigned char) sequenceNumber;
-    dataPacket[2] = (unsigned char) fileSize;
-    dataPacket[3] = (unsigned char) (fileSize >> 8);
+void createDataPacket(int sequenceNumber, int fileSize, unsigned char *dataPacket, unsigned char *inputData) {
+    dataPacket[0] = DATA;
+    dataPacket[1] = (unsigned char) (sequenceNumber % 256);
+    dataPacket[2] = (unsigned char) (fileSize / 256);
+    dataPacket[3] = (unsigned char) (fileSize % 256); //All 4 direct from requirements
+    for (size_t i = 0; i < fileSize; i++) {
+        dataPacket[i+4] = inputData[i];
+    }
 }
 
-void interpretDataPacket(int *sequenceNumber, int *fileSize, unsigned char *dataPacket) {
+void readDataPacket(int *sequenceNumber, int *fileSize, unsigned char *dataPacket, unsigned char *outputData) {
     *sequenceNumber = (int) dataPacket[1];
-    *fileSize = (int) dataPacket[2];
-    *fileSize <<= 8;
-    *fileSize += (int) dataPacket[3];
+    *fileSize = ((int) dataPacket[2]) * 256 + ((int) dataPacket[3]);
+    for (size_t i = 0; i < fileSize; i++) {
+        outputData[i] = dataPacket[i+4];
+    }
 }
 
 int findSize(char file_name[])
