@@ -1,4 +1,17 @@
-#include <iostream>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <termios.h>
+#include <unistd.h>
+#include <signal.h>
+
+// Baudrate settings are defined in <asm/termbits.h>, which is
+// included by <termios.h>
+#define BAUDRATE B38400
+#define _POSIX_SOURCE 1 // POSIX compliant source
 
 enum MACHINE {TRANSMITTER = 0, RECEIVER = 1};                                           //Machine constants
 enum HEADER_TYPE {INVALID = -1, INFO, SET, DISC, UA, RR, REJ};
@@ -14,13 +27,47 @@ int messageParity = 0;  //0 or 1, switches
 int alarmEnabled = 1;
 int fd;
 
+typedef enum
+{
+    LlTx,
+    LlRx,
+} LinkLayerRole;
+
+typedef struct
+{
+    char serialPort[50];
+    LinkLayerRole role;
+    int baudRate;
+    int nRetransmissions;
+    int timeout;
+} LinkLayer;
+
+// SIZE of maximum acceptable payload.
+// Maximum number of bytes that application layer should send to link layer
+#define MAX_PAYLOAD_SIZE 1000
+
+// MISC
+#define FALSE 0
+#define TRUE 1
+
 
 unsigned char getBCC(unsigned char *content, int size) {
-    unsigned char result = content[0];
+    unsigned char result;
+    if (content[0] == FLAG) {
+        result = 0x00;
+    }
+    else {
+        result = content[0];
+    }
     for (size_t i = 1; i < size; i++){
         result = result ^ content[i];
     }
     return result;
+}
+
+void alarmHandler(int signal)
+{
+    alarmEnabled = FALSE;
 }
 
 int getHeaderType(unsigned char *header, int *responseParity) {
@@ -245,22 +292,23 @@ int receivePacket(unsigned char *data, int *size, int *parityReceived) {
     //Internal State Machine
     enum STATE_MACHINE {WAIT_FOR_FLAG = 0, BUILDING_HEADER, WAIT_FOR_LAST_FLAG, FILLING_INFO, INFO_FILLED, OVER};
     unsigned char byteReceived;
-    int bytes;
+    int bytes = -1;
     int counter = 0;
     int state = WAIT_FOR_FLAG;
     int header = INVALID;
 
     while(alarmEnabled == 1 && state != OVER){
+        printf("state: %i\n", state);
         switch (state) {
             case WAIT_FOR_FLAG:
-                bytes = read(fd,byteReceived,1);
+                bytes = read(fd,&byteReceived,1);
                 if (bytes == 1 && byteReceived == FLAG) {
                     data[0] = FLAG;
                     state = BUILDING_HEADER;
                 }
                 break;
             case BUILDING_HEADER:
-                bytes = read(fd,byteReceived,1);
+                bytes = read(fd,&byteReceived,1);
                 if (bytes == 1) {
                     if (byteReceived == FLAG) {
                         counter = 0;
@@ -270,8 +318,9 @@ int receivePacket(unsigned char *data, int *size, int *parityReceived) {
                         data[counter] = byteReceived;
                     }
                 }
+                printf("c1:%i\n", counter);
                 if (counter == 3) {
-                    header = getHeaderType(data, &parityReceived);
+                    header = getHeaderType(data, parityReceived);
                     if (header == INVALID) {
                         state = WAIT_FOR_FLAG;
                         counter = 0;
@@ -284,8 +333,9 @@ int receivePacket(unsigned char *data, int *size, int *parityReceived) {
                         state = WAIT_FOR_LAST_FLAG;
                     }
                 }
+                break;
             case WAIT_FOR_LAST_FLAG:
-                bytes = read(fd,byteReceived,1);
+                bytes = read(fd,&byteReceived,1);
                 if (bytes == 1 && byteReceived == FLAG) {
                     state = OVER;
                 }
@@ -295,7 +345,7 @@ int receivePacket(unsigned char *data, int *size, int *parityReceived) {
                 }
                 break;
             case FILLING_INFO:
-                bytes = read(fd,byteReceived,1);
+                bytes = read(fd,&byteReceived,1);
                 if (bytes == 1 && byteReceived == FLAG) {
                     *size = counter;
                     state = INFO_FILLED;
@@ -309,9 +359,11 @@ int receivePacket(unsigned char *data, int *size, int *parityReceived) {
                 *size = removeStuffing(data, *size);
                 if (getBCC(data, (*size) - 2) != data[(*size) - 2]) {
                     counter = 0;
-                    sendPacket(REJ, 0, 0);
+
                     state = WAIT_FOR_FLAG;
                 }
+                printf("fim");
+                state = OVER;
                 break;
         }
     }
@@ -328,7 +380,7 @@ int sendPacket(int type, unsigned char * data, int dataSize) {
     (void)signal(SIGALRM, alarmHandler);
 
     while (!acknowledge) {
-        if (createHeader(header, type) != 0) {
+        if (createHeader(header, type, messageParity) != 0) {
             return -1;
         }
         if (type != INFO) {
@@ -337,6 +389,9 @@ int sendPacket(int type, unsigned char * data, int dataSize) {
             }
         }
         else {
+            if (write(fd, header, 4) != 4) {
+                return -1;
+            }
             for (int i = 0; i < dataSize; i++) {
                 msg[i] = data[i];
             }
@@ -346,6 +401,7 @@ int sendPacket(int type, unsigned char * data, int dataSize) {
             if (write(fd, msg, newSize) != newSize) {
                 return -1;
             }
+            printByteSequence(msg, 7);
         }
 
         alarm(10);
@@ -358,7 +414,7 @@ int sendPacket(int type, unsigned char * data, int dataSize) {
             break;
         }
 
-        typeResponse = receivePacket(newMsg, 0, &parityReceived);
+        typeResponse = receivePacket(msg, 0, &parityReceived);
 
         if (type == SET) {
             if (typeResponse == UA) {
@@ -404,9 +460,11 @@ int llopen(LinkLayer connectionParameters)
 {
     if (connectionParameters.tx) {
         machine = TRANSMITTER;
+        messageParity = 0;
     }
     else if (connectionParameters.rx) {
         machine = RECEIVER;
+        messageParity = 1;
     }
 
     fd = open(serialPortName, O_RDWR | O_NOCTTY);
@@ -520,6 +578,7 @@ int llopen(LinkLayer connectionParameters)
             if(sendPacket(DISC, 0, 0) != 0){
                 return -1;
             }
+            return 0;
         }
         return 0;
     }
