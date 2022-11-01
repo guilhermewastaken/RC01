@@ -138,52 +138,51 @@ int setupReceiver(LinkLayer connectionParameters, int *fileSize) {
 
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename) {
-    LinkLayer connectionParameters = {};
-    //if role transmitter
-    setupTransmitter(connectionParameters, filename);
-    FILE *filePtr;
-    filePtr = fopen(filename,"rb");
-    unsigned char frame[FRAME_SIZE];
-    int counter = 0;
-    while(!feof(filePtr)) {
-        fread(frame,INPUT_SIZE,1,filePtr);
-        for (size_t i = INPUT_SIZE; i >= 0; i--) {
-            frame[i+4] = frame[i];
+    LinkLayer connectionParameters = {serialPort, role, baudRate, nTries, timeout};
+    if (connectionParameters.role == LlTx) {    //Transmitter
+        setupTransmitter(connectionParameters, filename);
+        FILE *filePtr;
+        filePtr = fopen(filename, "rb");
+        unsigned char frame[FRAME_SIZE];
+        unsigned char input[INPUT_SIZE];
+        int counter = 0;
+        while (!feof(filePtr)) {
+            fread(input, INPUT_SIZE, 1, filePtr);
+            createDataPacket(counter, INPUT_SIZE, frame, input);
+            if (llwrite(frame, INPUT_SIZE + 4) == -1) {
+                printf("Error sending data packet\n");
+            }
+            counter++;
         }
-        startDataPacket(counter, INPUT_SIZE, frame);
-        if (llwrite(frame, INPUT_SIZE) == -1) {
-            printf("Error sending data packet\n");
+        fclose(filePtr);
+        if (llclose(0) == -1) {
+            printf("Error in llclose\n");
         }
-        counter++;
     }
-    fclose(filePtr);
-    if (llclose(0) == -1) {
-        printf("Error in llclose\n");
+    else if (connectionParameters.role == LlRx) {
+        int fileSize;
+        unsigned char frame[FRAME_SIZE];
+        unsigned char output[FRAME_SIZE];
+        FILE *filePtr;
+        filePtr = fopen(filename, "wb");
+        setupReceiver(connectionParameters, &fileSize);
+        while (1) {
+            int opt = llread(frame);
+            if (opt == -1) {
+                printf("Error receiving data packet\n");
+            } else if (opt == 0) {  //llclose
+                fclose(filePtr);
+                printf("Transfer complete\n");
+                break;
+            }
+            int sequenceNumber;
+            int size;
+            readDataPacket(&sequenceNumber, &size, frame, output);
+            fwrite(output, INPUT_SIZE, 1, filePtr);
+            printf("Succesfully wrote %i frame\n", sequenceNumber);
+        }
     }
-
-    //else
-    int fileSize;
-    unsigned char frame[FRAME_SIZE]; //Error because if isnt done
-    FILE *filePtr;                             //""
-    filePtr = fopen(filename,"wb");
-    setupReceiver(connectionParameters, &fileSize);
-    while (1) {
-        int opt = llread(frame);
-        if (opt == -1) {
-            printf("Error receiving data packet\n");
-        }
-        else if (opt == 0) {  //llclose
-            fclose(filePtr);
-            printf("Transfer complete\n");
-            break;
-        }
-        int sequenceNumber;
-        int size;
-        interpretDataPacket(&sequenceNumber, &size, frame);
-        for (size_t i = 0; i < size; i++) {
-            frame[i] = frame[i+4];
-        }
-        fwrite(frame, INPUT_SIZE, 1, filePtr);
+    else {
+        printf("Error in role");
     }
-
 }
