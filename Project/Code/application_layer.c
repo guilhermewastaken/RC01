@@ -33,26 +33,27 @@ void writeToFile(FILE *filePtr, unsigned char *fileContent, int size) {
 }
 
 int createControlPacket(int type, int fileSize, unsigned char *controlPacket) {
-    //Size of controlPacket array should be 6
+    //Returns the size of the controlPacket
     controlPacket[0] = (unsigned char) type;
-    controlPacket[1] = 0;
+    controlPacket[1] = 0; //We are only sending file size, not name
     int i = 2;
-    for (i = 2; i < sizeof(int) + 2; i++) {
-        printf("%i", i);
-        controlPacket[i] = (unsigned char) fileSize;
-        fileSize >>= 8;
+    while (fileSize > 0) {
+        i++; //At the beginning so i is the number of bytes actually used
+        controlPacket[i] = (unsigned char) (fileSize % 256);
+        fileSize = fileSize / fileSize;
     }
+    controlPacket[2] = i - 2; //Number of bytes needed for file size
     return i; //Size
 }
 
 void readControlPacket(int *type, int *fileSize, unsigned char *controlPacket) {
-    *type = (int) controlPacket[0];
-    int packetNum = (int) controlPacket[1];
+    *type = (int) controlPacket[0]; //controlPacket[1] is irrelevant since we are only sending the file size
     *fileSize = 0;
-    for (int i = 2; i < packetNum + 2; i++) {
-        *fileSize += (controlPacket[i]);
-        *fileSize <<= 8;
+    for (size_t i = controlPacket[2] + 2; i >= 0; i--) {
+        *fileSize = *fileSize * 256 + ((int) controlPacket[i]);
+        //We are rebuilding the size in the opposite direction
     }
+    //No need to return size since we are saving fileSize already
 }
 
 void startDataPacket(int sequenceNumber, int fileSize, unsigned char *dataPacket) {
