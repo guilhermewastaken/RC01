@@ -393,16 +393,17 @@ int sendPacket(int type, unsigned char * data, int dataSize) {
             for (int i = 0; i < dataSize; i++) {
                 msg[i] = data[i];
             }
+            printf("%i - data size\n", dataSize);
+            printByte(msg[dataSize - 1]);
             msg[dataSize] = getBCC(data, dataSize);
             msg[dataSize + 1] = FLAG;
-            newSize = addStuffing(msg, dataSize);
+            newSize = addStuffing(msg, dataSize + 1);
             if (write(fd, msg, newSize) != newSize) {
                 return -1;
             }
-            printByteSequence(msg, 7);
         }
 
-        alarm(10);
+        alarm(3);
         int typeResponse;
         int parityReceived;
 
