@@ -35,10 +35,6 @@ void printByteSequence(unsigned char *sequence, int size) {
     printf("%hhx\n", sequence[size-1]);
 }
 
-void writeToFile(FILE *filePtr, unsigned char *fileContent, int size) {
-    fwrite(fileContent, size, 1, filePtr);
-}
-
 int createControlPacket(int type, int fileSize, unsigned char *controlPacket) {
     //Returns the size of the controlPacket
     controlPacket[0] = (unsigned char) type;
@@ -50,13 +46,13 @@ int createControlPacket(int type, int fileSize, unsigned char *controlPacket) {
         fileSize = fileSize / fileSize;
     }
     controlPacket[2] = i - 2; //Number of bytes needed for file size
-    return i; //Size
+    return i + 1; //Size (last index + 0)
 }
 
 void readControlPacket(int *type, int *fileSize, unsigned char *controlPacket) {
     *type = (int) controlPacket[0]; //controlPacket[1] is irrelevant since we are only sending the file size
     *fileSize = 0;
-    for (size_t i = controlPacket[2] + 2; i >= 0; i--) {
+    for (int i = ((int) controlPacket[2]) + 2; i > 2; i--) {
         *fileSize = *fileSize * 256 + ((int) controlPacket[i]);
         //We are rebuilding the size in the opposite direction
     }
@@ -81,8 +77,7 @@ void readDataPacket(int *sequenceNumber, int *fileSize, unsigned char *dataPacke
     }
 }
 
-int findSize(char file_name[])
-{
+int findSize(char file_name[]) {
     FILE* fp = fopen(file_name, "r");
     if (fp == NULL) {
         printf("File is not in the correct place/doesn't exist\n");
@@ -95,7 +90,7 @@ int findSize(char file_name[])
 }
 
 
-int setupTransmitter(LinkLayer connectionParameters, char file_name[]) {
+int setupTransmitter(LinkLayer connectionParameters, char filename[]) {
     if (llopen(connectionParameters) != 1) {
         printf("Error in llopen\n");
         return -1;
@@ -104,7 +99,7 @@ int setupTransmitter(LinkLayer connectionParameters, char file_name[]) {
 
     //Send control packet
     unsigned char *frame[FRAME_SIZE];
-    int size = createControlPacket(START,findSize(file_name),frame);
+    int size = createControlPacket(START,findSize(filename),frame);
     if (llwrite(frame, size) == -1) {
         printf("Error sending control packet\n");
     }
@@ -139,6 +134,7 @@ int setupReceiver(LinkLayer connectionParameters, int *fileSize) {
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename) {
     LinkLayer connectionParameters = {serialPort, role, baudRate, nTries, timeout};
+
     if (connectionParameters.role == LlTx) {    //Transmitter
         setupTransmitter(connectionParameters, filename);
         FILE *filePtr;
@@ -173,7 +169,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         unsigned char frame[FRAME_SIZE];
         unsigned char output[FRAME_SIZE];
         FILE *filePtr;
-        filePtr = fopen(filename, "wb");
+        filePtr = fopen("penguin.gif", "wb");
         setupReceiver(connectionParameters, &fileSize);
         while (1) {
             if (llread(frame) == -1) {
@@ -189,7 +185,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             int sequenceNumber;
             int size;
             readDataPacket(&sequenceNumber, &size, frame, output);
-            fwrite(output, INPUT_SIZE, 1, filePtr);
+            fwrite(output, size, 1, filePtr);
             printf("Succesfully wrote %i frame\n", sequenceNumber);
         }
     }
