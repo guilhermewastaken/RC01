@@ -456,22 +456,19 @@ int sendPacket(int type, unsigned char * data, int dataSize) {
     return 0;
 }
 
-int llopen(LinkLayer connectionParameters)
-{
-    if (connectionParameters.tx) {
+int llopen(LinkLayer connectionParameters) {
+    if (connectionParameters.role == LlTx) {
         machine = TRANSMITTER;
         messageParity = 0;
-    }
-    else if (connectionParameters.rx) {
+    } else if (connectionParameters.role == LlRx) {
         machine = RECEIVER;
         messageParity = 1;
     }
 
-    fd = open(serialPortName, O_RDWR | O_NOCTTY);
+    fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY);
 
-    if (fd < 0)
-    {
-        perror(serialPortName);
+    if (fd < 0) {
+        perror(connectionParameters.serialPort);
         exit(-1);
     }
 
@@ -479,8 +476,7 @@ int llopen(LinkLayer connectionParameters)
     struct termios newtio;
 
     // Save current port settings
-    if (tcgetattr(fd, &oldtio) == -1)
-    {
+    if (tcgetattr(fd, &oldtio) == -1) {
         perror("tcgetattr");
         exit(-1);
     }
@@ -508,54 +504,57 @@ int llopen(LinkLayer connectionParameters)
     tcflush(fd, TCIOFLUSH);
 
     // Set new port settings
-    if (tcsetattr(fd, TCSANOW, &newtio) == -1)
-    {
+    if (tcsetattr(fd, TCSANOW, &newtio) == -1) {
         perror("tcsetattr");
         exit(-1);
     }
 
     printf("New termios structure set\n");
 
-    if(machine == TRANSMITTER){
-        if(sendPacket(SET, 0, 0) != 0){
+    unsigned char *packet[ARRAY_SIZE];
+    if (machine == TRANSMITTER) {
+        if (sendPacket(SET, packet, 0) != 0) {
             return -1;
         }
     }
-    else if (machine == RECEIVER){
-        int type = receivePacket(0, 0);
-        if(type == SET){
-            if(sendPacket(UA, 0, 0) != 0){
+    else if (machine == RECEIVER) {
+        int parityReceived, size;
+        int type = receivePacket(packet, &size, &parityReceived);
+        if (type == SET) {
+            if (sendPacket(UA, packet, 0) != 0) {
                 return -1;
             }
         }
+        else {
+            return -1;
+        }
         return 1;
     }
+}
 
 ////////////////////////////////////////////////
 // LLWRITE
 ////////////////////////////////////////////////
-    int llwrite(const unsigned char *buf, int bufSize)
-    {
+    int llwrite(const unsigned char *buf, int bufSize) {
         if(machine == TRANSMITTER){
             if(sendPacket(INFO, buf, bufSize) != 0){
                 return -1;
             }
         }
 
-        return 0;
+        return bufSize;
     }
 
 ////////////////////////////////////////////////
 // LLREAD
 ////////////////////////////////////////////////
-    int llread(unsigned char *packet)
-    {
-        if(machine == RECEIVER){
+    int llread(unsigned char *packet) {
+        if(machine == RECEIVER) {
             int msgSize;
             int parityReceived;
             int type = receivePacket(packet, &msgSize, &parityReceived);
-            if(type == INFO){
-                if (parityReceived == messageParity){
+            if (type == INFO) {
+                if (parityReceived == messageParity) {
                     if (messageParity == 0) {
                         messageParity = 1;
                     }
@@ -565,20 +564,21 @@ int llopen(LinkLayer connectionParameters)
                     else {
                         return -1;
                     }
-                    if(sendPacket(RR, 0, 0) != 0){
+                    if (sendPacket(RR, 0, 0) != 0) {
                         return -1;
                     }
                 }
                 else {
                     return -1;
                 }
+                return msgSize;
             }
-        }
-        else if(type == DISC){
-            if(sendPacket(DISC, 0, 0) != 0){
-                return -1;
+            else if (type == DISC) {
+                if (sendPacket(DISC, 0, 0) != 0) {
+                    return -1;
+                }
+                return 0;
             }
-            return 0;
         }
         return 0;
     }
@@ -587,15 +587,16 @@ int llopen(LinkLayer connectionParameters)
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-    int llclose(int showStatistics)
-    {
+    int llclose(int showStatistics) {
+        unsigned char *packet[ARRAY_SIZE];
         if(machine == TRANSMITTER){
-            if(sendPacket(DISC, 0, 0) != 0){
+            if(sendPacket(DISC, packet, 0) != 0){
                 return -1;
             }
-            int type = receivePacket(0, 0);
+            int size, parityReceived;
+            int type = receivePacket(packet, &size, &parityReceived);
             if(type == DISC){
-                if(sendPacket(UA, 0, 0) != 0){
+                if(sendPacket(UA, packet, 0) != 0){
                     return -1;
                 }
             }
