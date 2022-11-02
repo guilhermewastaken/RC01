@@ -456,19 +456,31 @@ int sendPacket(int type, unsigned char * data, int dataSize) {
     return 0;
 }
 
-int llopen(LinkLayer connectionParameters) {
-    if (connectionParameters.role == LlTx) {
-        machine = TRANSMITTER;
-        messageParity = 0;
-    } else if (connectionParameters.role == LlRx) {
-        machine = RECEIVER;
-        messageParity = 1;
+int main(int argc, char *argv[]) {
+    machine = RECEIVER;
+    messageParity = 1;
+    //Setup code for BOTH machines
+
+    //Will be deleted afterwards
+    const char *serialPortName = argv[1];
+
+    if (argc < 2)
+    {
+        printf("Incorrect program usage\n"
+               "Usage: %s <SerialPort>\n"
+               "Example: %s /dev/ttyS1\n",
+               argv[0],
+               argv[0]);
+        exit(1);
     }
+    //---------------------
 
-    fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY);
 
-    if (fd < 0) {
-        perror(connectionParameters.serialPort);
+    fd = open(serialPortName, O_RDWR | O_NOCTTY);
+
+    if (fd < 0)
+    {
+        perror(serialPortName);
         exit(-1);
     }
 
@@ -476,7 +488,8 @@ int llopen(LinkLayer connectionParameters) {
     struct termios newtio;
 
     // Save current port settings
-    if (tcgetattr(fd, &oldtio) == -1) {
+    if (tcgetattr(fd, &oldtio) == -1)
+    {
         perror("tcgetattr");
         exit(-1);
     }
@@ -490,7 +503,7 @@ int llopen(LinkLayer connectionParameters) {
 
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 1; // Inter-character timer unused
+    newtio.c_cc[VTIME] = 10; // Inter-character timer unused
     newtio.c_cc[VMIN] = 0;  // Blocking read until 5 chars received
 
     // VTIME e VMIN should be changed in order to protect with a
@@ -504,103 +517,58 @@ int llopen(LinkLayer connectionParameters) {
     tcflush(fd, TCIOFLUSH);
 
     // Set new port settings
-    if (tcsetattr(fd, TCSANOW, &newtio) == -1) {
+    if (tcsetattr(fd, TCSANOW, &newtio) == -1)
+    {
+        perror("tcsetattr");
+        exit(-1);
+    }
+    printf("New termios structure set\n");
+
+    // Wait until all bytes have been written to the serial port
+    sleep(1);
+
+    unsigned char *output[1000];
+
+    int size;
+    int parity;
+    //Open
+    if (receivePacket(output, &size, &parity) == SET) {
+        sendPacket(UA, output, 0);
+    }
+    printf("Open done\n");
+
+    //Read
+    FILE *filePtr;
+    filePtr = fopen("pinguim2.gif", "wb");
+
+    while (1) {
+        int type = receivePacket(output, &size, &parity);
+        if (type == DISC) {
+            sendPacket(DISC, output, 0);
+            printf("Transmission closed\n");
+            fclose(filePtr);
+            break;
+        }
+        else if (type == INFO) {
+            fwrite(output, size, 1, filePtr);
+        }
+    }
+    
+    
+    //WRITE YOUR CODE HERE!!!!!!!!!!
+
+    
+    
+    
+    // Restore the old port settings
+    if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
+    {
         perror("tcsetattr");
         exit(-1);
     }
 
-    printf("New termios structure set\n");
-
-    unsigned char *packet[ARRAY_SIZE];
-    if (machine == TRANSMITTER) {
-        if (sendPacket(SET, packet, 0) != 0) {
-            return -1;
-        }
-    }
-    else if (machine == RECEIVER) {
-        int parityReceived, size;
-        int type = receivePacket(packet, &size, &parityReceived);
-        if (type == SET) {
-            if (sendPacket(UA, packet, 0) != 0) {
-                return -1;
-            }
-        }
-        else {
-            return -1;
-        }
-        return 1;
-    }
+    close(fd);
+    
+    return 0;
 }
 
-////////////////////////////////////////////////
-// LLWRITE
-////////////////////////////////////////////////
-    int llwrite(const unsigned char *buf, int bufSize) {
-        if(machine == TRANSMITTER){
-            if(sendPacket(INFO, buf, bufSize) != 0){
-                return -1;
-            }
-        }
-
-        return bufSize;
-    }
-
-////////////////////////////////////////////////
-// LLREAD
-////////////////////////////////////////////////
-    int llread(unsigned char *packet) {
-        if(machine == RECEIVER) {
-            int msgSize;
-            int parityReceived;
-            int type = receivePacket(packet, &msgSize, &parityReceived);
-            if (type == INFO) {
-                if (parityReceived == messageParity) {
-                    if (messageParity == 0) {
-                        messageParity = 1;
-                    }
-                    else if (messageParity == 1) {
-                        messageParity = 0;
-                    }
-                    else {
-                        return -1;
-                    }
-                    if (sendPacket(RR, 0, 0) != 0) {
-                        return -1;
-                    }
-                }
-                else {
-                    printf("Wrong parity-llread\n");
-                    return -1;
-                }
-                return msgSize;
-            }
-            else if (type == DISC) {
-                if (sendPacket(DISC, 0, 0) != 0) {
-                    return -1;
-                }
-                return 0;
-            }
-        }
-        return 0;
-    }
-
-
-////////////////////////////////////////////////
-// LLCLOSE
-////////////////////////////////////////////////
-    int llclose(int showStatistics) {
-        unsigned char *packet[ARRAY_SIZE];
-        if(machine == TRANSMITTER){
-            if(sendPacket(DISC, packet, 0) != 0){
-                return -1;
-            }
-            int size, parityReceived;
-            int type = receivePacket(packet, &size, &parityReceived);
-            if(type == DISC){
-                if(sendPacket(UA, packet, 0) != 0){
-                    return -1;
-                }
-            }
-        }
-        return 1;
-    }
