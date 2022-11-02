@@ -155,11 +155,20 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             counter++;
         }
         fclose(filePtr);
+        printf("Penguin sent\n");
+
+        //Send control packet
+        int size = createControlPacket(END,findSize(filename),frame);
+        if (llwrite(frame, size) == -1) {
+            printf("Error sending final control packet\n");
+        }
+        printf("Final control packet sent\n");
+
         if (llclose(0) == -1) {
             printf("Error in llclose\n");
         }
     }
-    else if (connectionParameters.role == LlRx) {
+    else if (connectionParameters.role == LlRx) { //Receiver
         int fileSize;
         unsigned char frame[FRAME_SIZE];
         unsigned char output[FRAME_SIZE];
@@ -167,12 +176,14 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         filePtr = fopen(filename, "wb");
         setupReceiver(connectionParameters, &fileSize);
         while (1) {
-            int opt = llread(frame);
-            if (opt == -1) {
+            if (llread(frame) == -1) {
                 printf("Error receiving data packet\n");
-            } else if (opt == 0) {  //llclose
+
+            } else if (frame[0] == END) {  //Last control packet
                 fclose(filePtr);
                 printf("Transfer complete\n");
+                llread(frame); //Receive DISC
+                printf("Disconnecting\n");
                 break;
             }
             int sequenceNumber;
