@@ -298,7 +298,6 @@ int receivePacket(unsigned char *data, int *size, int *parityReceived) {
     int header = INVALID;
 
     while(alarmEnabled == 1 && state != OVER){
-        printf("state: %i\n", state);
         switch (state) {
             case WAIT_FOR_FLAG:
                 bytes = read(fd,&byteReceived,1);
@@ -318,7 +317,6 @@ int receivePacket(unsigned char *data, int *size, int *parityReceived) {
                         data[counter] = byteReceived;
                     }
                 }
-                printf("c1:%i\n", counter);
                 if (counter == 3) {
                     header = getHeaderType(data, parityReceived);
                     if (header == INVALID) {
