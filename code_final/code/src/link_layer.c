@@ -416,6 +416,7 @@ int sendPacket(int type, const unsigned char * data, int dataSize) {
                 continue;
             }
             if (typeResponse == RR && parityReceived != messageParity) {
+                printf("Here1\n");
                 acknowledge = 1;
                 alarm(0);
                 if (messageParity == 0) {
