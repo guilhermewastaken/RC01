@@ -532,7 +532,7 @@ int llopen(LinkLayer connectionParameters) {
             int parityReceived;
             int type = receivePacket(packet, &msgSize, &parityReceived);
             if (type == INFO) {
-                if (parityReceived == messageParity) {
+                if (parityReceived != messageParity) {
                     if (messageParity == 0) {
                         messageParity = 1;
                     }
