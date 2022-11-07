@@ -133,8 +133,13 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         int counter = 0;
         while (!feof(filePtr)) {
             printf("Sent a frame\n");
-            fread(input, INPUT_SIZE, 1, filePtr);
-            createDataPacket(counter, INPUT_SIZE, frame, input);
+            int currentI = 0;
+            while (!feof(filePtr) && currentI < INPUT_SIZE) {
+                fread(input + currentI, 1, 1, filePtr);
+            }
+
+            //fread(input, INPUT_SIZE, 1, filePtr);
+            createDataPacket(counter, currentI, frame, input);
             if (llwrite(frame, INPUT_SIZE + 4) == -1) {
                 printf("Error sending data packet\n");
             }
