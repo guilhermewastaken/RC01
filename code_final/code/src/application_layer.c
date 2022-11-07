@@ -161,6 +161,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         FILE *filePtr;
         filePtr = fopen("penguin.gif", "wb");
         setupReceiver(connectionParameters, &fileSize);
+
+        int filledSize = 0;
+
         while (1) {
             if (llread(frame) == -1) {
                 printf("Error receiving data packet\n");
@@ -175,6 +178,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             int sequenceNumber;
             int size;
             readDataPacket(&sequenceNumber, &size, frame, output);
+            printf("FILLING: %i bytes with %i new bytes", filledSize, size);
+            filledSize = fileSize + size;
+            printf(". Result: %i\n", filledSize);
             fwrite(output, size, 1, filePtr);
             printf("Succesfully wrote %i frame\n", sequenceNumber);
         }
