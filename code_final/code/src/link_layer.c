@@ -536,6 +536,9 @@ int llopen(LinkLayer connectionParameters) {
             int type = receivePacket(packet, &msgSize, &parityReceived);
             if (type == INFO) {
                 if (parityReceived != messageParity) {
+                    if (sendPacket(RR, 0, 0) != 0) {
+                        return -1;
+                    }
                     if (messageParity == 0) {
                         messageParity = 1;
                     }
@@ -543,9 +546,6 @@ int llopen(LinkLayer connectionParameters) {
                         messageParity = 0;
                     }
                     else {
-                        return -1;
-                    }
-                    if (sendPacket(RR, 0, 0) != 0) {
                         return -1;
                     }
                 }
