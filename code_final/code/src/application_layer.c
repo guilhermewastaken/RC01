@@ -179,7 +179,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             int size;
             readDataPacket(&sequenceNumber, &size, frame, output);
             printf("FILLING: %i bytes with %i new bytes", filledSize, size);
-            filledSize = fileSize + size;
+            filledSize = filledSize + size;
             printf(". Result: %i\n", filledSize);
             fwrite(output, size, 1, filePtr);
             printf("Succesfully wrote %i frame\n", sequenceNumber);
