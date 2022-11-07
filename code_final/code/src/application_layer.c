@@ -173,6 +173,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 printf("Transfer complete\n");
                 llread(frame); //Receive DISC
                 printf("Disconnecting\n");
+                printf("File Size: %i\n", fileSize);
                 break;
             }
             int sequenceNumber;
