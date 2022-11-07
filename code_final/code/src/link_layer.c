@@ -268,6 +268,7 @@ void printByteSequence(unsigned char *sequence, int size) {
 //----------------TESTED AND VALIDATED UNTIL HERE---------------
 
 int receivePacket(unsigned char *data, int *size, int *parityReceived) {
+    prinf("Receiving packet, parity %i", messageParity);
     //Internal State Machine
     enum STATE_MACHINE {WAIT_FOR_FLAG = 0, BUILDING_HEADER, WAIT_FOR_LAST_FLAG, FILLING_INFO, INFO_FILLED, OVER};
     unsigned char byteReceived;
@@ -347,6 +348,7 @@ int receivePacket(unsigned char *data, int *size, int *parityReceived) {
 }
 
 int sendPacket(int type, const unsigned char * data, int dataSize) {
+    prinf("Sending packet, parity %i", messageParity);
     unsigned char header[5];
     unsigned char msg[MAX_ARRAY_SIZE];
     int acknowledge = 0;
